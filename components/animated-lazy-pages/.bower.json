@@ -1,0 +1,45 @@
+{
+  "name": "animated-lazy-pages",
+  "authors": [
+    "Paul Varache <perso@paulvarache.ninja>"
+  ],
+  "description": "Manages the transition and their animations between pages, lazy loading the dependencies.",
+  "keywords": [
+    "web-component",
+    "polymer",
+    "container",
+    "lazy-loading"
+  ],
+  "main": "animated-lazy-pages.html",
+  "license": "http://polymer.github.io/LICENSE.txt",
+  "homepage": "http://paulvarache.github.io/animated-lazy-pages/",
+  "ignore": [
+    "/.*",
+    "/test/"
+  ],
+  "dependencies": {
+    "polymer": "Polymer/polymer#^1.0.0",
+    "iron-selector": "polymerelements/iron-selector#^1.0.0",
+    "neon-animation": "PolymerElements/neon-animation#^1.2.3"
+  },
+  "devDependencies": {
+    "iron-component-page": "polymerelements/iron-component-page#transitiveBehaviors",
+    "web-component-tester": "*",
+    "paper-tabs": "PolymerElements/paper-tabs#^1.4.1",
+    "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^1.1.1",
+    "paper-spinner": "PolymerElements/paper-spinner#^1.1.1"
+  },
+  "resolutions": {
+    "iron-component-page": "transitiveBehaviors"
+  },
+  "_release": "d5cffd66ce",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "d5cffd66cee5766841ead51764eece0ded4971be"
+  },
+  "_source": "git://github.com/paulvarache/animated-lazy-pages.git",
+  "_target": "master",
+  "_originalSource": "paulvarache/animated-lazy-pages",
+  "_direct": true
+}

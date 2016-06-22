@@ -1,0 +1,405 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../iron-selector/iron-selectable.html">
+<link rel="import" href="../neon-animation/neon-animation-runner-behavior.html">
+
+<!--
+# animated-lazy-pages
+
+It's as if [`<iron-lazy-pages>`](https://github.com/TimvdLippe/iron-lazy-pages) and [`<neon-animated-pages>`](https://elements.polymer-project.org/elements/neon-animation) had a baby.
+
+## Features
+
+`animated-lazy-pages` is pretty much similar to `iron-lazy-pages`. It adds the pages to the DOM only once selected.
+In the same way dom-repeat uses CSS to hide show templates already added to the DOM, `animated-lazy-pages` will add `display: none` to hide the pages.
+You can override this behavior with `restamp`, `animated-lazy-pages` will them remove from the DOM and add again the pages when selected/deselected
+
+### Animating pages
+
+All the lazy-loading logic is explained here [`<iron-lazy-pages>`](https://github.com/TimvdLippe/iron-lazy-pages), so we'll jump to animating
+
+On each page change, `animated-lazy-pages` will grab the animation target of the previous and current page and play the animations.
+It means that in your pages templates, you will need to define an animation target with the `animation-target` attribute, and this animation target must have the `neon-animatable-behavior` behavior.
+You can either use `neon-animatable` or create your own page element that will have the `neon-animatable-behavior`
+
+Example:
+```html
+<animated-lazy-pages attr-for-selected="name" selected="{{page}}" animate-initial-selection>
+  <template is="animated-lazy-page" name="awesome">
+    <neon-animatable entry-animation="fade-in-animation" animation-target>My awesome page</neon-animatable>
+  </template>
+</animated-lazy-pages>
+```
+In the above example, when `page` is set to `awesome`, `animated-lazy-pages` will play its animation.
+note that we use `animate-initial-selection` to trigger the animation even when the page is selected for the first time.
+
+
+## transition between pages
+
+When switching between pages, an `exit` animation on the previous page and an `entry` animation will be played.
+
+Example
+```html
+<animated-lazy-pages attr-for-selected="name" selected="{{page}}" animate-initial-selection>
+  <template is="animated-lazy-page" name="awesome">
+    <neon-animatable entry-animation="fade-in-animation" exit-animation="fade-out-animation" animation-target>My awesome page</neon-animatable>
+  </template>
+  <template is="animated-lazy-page" name="still-awesome">
+    <neon-animatable entry-animation="fade-in-animation" exit-animation="fade-out-animation" animation-target>Whoa, another awesome page</neon-animatable>
+  </template>
+</animated-lazy-pages>
+```
+In the above example, switching between pages will be sweet sweet for the eyes as the `fade-in-animation` on the entering page and the `fade-out-animation` on the leaving page will be played at the same time.
+If you don't believe me, check out the demos.
+
+This is not enough as you will probably want to play different animations as you go to or come from a specific page.
+Fear not, for `animated-lazy-pages` is with you!
+By default, `animated-lazy-pages` will generate animation names based of the `attr-for-selected` attribute on the `animated-lazy-page`.
+
+Example:
+
+```html
+<animated-lazy-pages attr-for-selected="name" selected="{{page}}" animate-initial-selection>
+  <template is="animated-lazy-page" name="awesome">
+    <neon-animatable entry-animation="fade-in-animation" exit-animation="fade-out-animation" animation-target>My awesome page</neon-animatable>
+  </template>
+  <template is="animated-lazy-page" name="still-awesome">
+    <neon-animatable entry-animation="fade-in-animation" exit-animation="fade-out-animation" animation-target>Whoa, another awesome page</neon-animatable>
+  </template>
+</animated-lazy-pages>
+```
+
+Here, when switching from `awseome` to `still-awesome`, `animated-lazy-pages` will play the `to-still-awesome` animation on the animation target of the `awesome` page.
+With the same logic, the `from-awesome` animation will be played on the animation target of the `still-awseome` page. As a fallback, the `exit` and `entry` animations will be played if the `to-still-awesome` or `from-awesome` animations are not configured on the animation targets.
+
+@element animated-lazy-pages
+@demo demo/animated-lazy-pages.html
+@hero hero.svg
+-->
+<dom-module id="animated-lazy-pages">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+    <content></content>
+  </template>
+  <script>
+  (function() {
+    Polymer({
+
+      is: 'animated-lazy-pages',
+
+      behaviors: [Polymer.IronSelectableBehavior, Polymer.NeonAnimationRunnerBehavior],
+
+      properties: {
+        // as the selected page is the only one visible, activateEvent
+        // is both non-sensical and problematic; e.g. in cases where a user
+        // handler attempts to change the page and the activateEvent
+        // handler immediately changes it back
+        // Disabled for this element.
+        activateEvent: {
+          type: String,
+          value: null
+        },
+
+        /**
+         * Indicates if the page is currently lazy-loading.
+         */
+        loading: {
+          type: Boolean,
+          value: false,
+          notify: true,
+          readOnly: true
+        },
+
+        /**
+         * When true, elements will be removed from DOM and discarded when
+         * the page path does not match anymore and re-created and added back
+         * to the DOM when the page path matches again.
+         * By default, stamped elements will be hidden but left in the DOM
+         * when a page path does not match anymore, which is generally results
+         * in better performance.
+         */
+        restamp: {
+          type: Boolean,
+          value: false
+        },
+        // if true, the initial page selection will also be animated according to its animation config.
+        animateInitialSelection: {
+          type: Boolean,
+          value: false
+        }
+      },
+
+      listeners: {
+        'iron-select': '_itemSelected'
+      },
+
+      _itemSelected: function(event) {
+        var newPage = event.detail.item,
+            oldPage = this._valueToItem(this._prevSelected),
+            oldPageName = oldPage ? oldPage.getAttribute(this.attrForSelected) : null,
+            newPageName = newPage ? newPage.getAttribute(this.attrForSelected) : null,
+            fromName = oldPage ? 'from-' + oldPageName : 'entry',
+            toName = 'to-' + newPageName,
+            animating;
+
+        this._prevSelected = this.selected;
+        // Do not listen to possible sub-selectors if these fired and iron-select
+        if (event.target !== this) {
+          return;
+        }
+        this._setLoading(true);
+        // Cancel currently running animations, in case page changes happened fast
+        this.cancelAnimation();
+        // Removes the animating class from all the pages
+        animating = Polymer.dom(this.root).querySelectorAll('.animating');
+        for (var i = 0; i < animating.length; i++) {
+          this.toggleClass('animating', false, animating[i]);
+        }
+        // Load the new page
+        newPage._loadAndShow(function() {
+          this._setLoading(false);
+          this.async(function () {
+              this.animationConfig = [];
+              var newTarget,
+                  oldTarget,
+                  onAnimationFinish = function () {
+                      this.removeEventListener('neon-animation-finish', onAnimationFinish, false);
+                      if (newTarget) {
+                          this.toggleClass('animating', false, newTarget);
+                      }
+                      if (oldPage) {
+                          this.toggleClass('animating', false, oldTarget);
+                          oldPage._hide(this.restamp);
+                      }
+                  }.bind(this);
+              // Do not configure the new page animation if this is the initial nimation and `animateInitialSelection` is not set
+              if (oldPage || this.animateInitialSelection) {
+                  newTarget = this._getAnimationTarget(newPage);
+                  if (newTarget.getAnimationConfig) {
+                      if (!this._hasAnimation(newTarget, fromName)) {
+                          fromName = 'entry';
+                      }
+                      this.animationConfig.push({
+                          animatable: newTarget,
+                          type: fromName
+                      });
+                  }
+              }
+              if (oldPage) {
+                  oldTarget = this._getAnimationTarget(oldPage);
+                  if (oldTarget.getAnimationConfig) {
+                      if (!this._hasAnimation(oldTarget, toName)) {
+                          toName = 'exit';
+                      }
+                      this.animationConfig.push({
+                          animatable: oldTarget,
+                          type: toName
+                      });
+                  }
+                  this._fillFromToPage(oldTarget, newTarget, toName);
+                  this.toggleClass('animating', true, oldTarget);
+              }
+              if (newTarget) {
+                  this._fillFromToPage(newTarget, oldTarget, fromName, true);
+                  this.toggleClass('animating', true, newTarget);
+              }
+              this.addEventListener('neon-animation-finish', onAnimationFinish, false);
+              this.playAnimation(undefined, {
+                 fromPage: oldTarget,
+                 toPage: newTarget
+              });
+          }.bind(this));
+        }.bind(this));
+      },
+
+      /**
+       * Goes through the animations of a page and fills the `fromPage` or `toPage` missing fields
+       * @param  {HTMLElement}  animtable   Element with the animation configuration
+       * @param  {HTMLElement}  target      Other element, targetted by the `fromPage` of `toPage`
+       * @param  {String}       type        Type of the animation (e.g. `entry`, `exit`...)
+       * @param  {Boolean}      entering    Defines the direction of the animation. Set to `true` to configure the entering page, `false` to configure the leaving page
+       */
+      _fillFromToPage: function (animatable, target, type, entering) {
+          var pageKey = entering ? 'fromPage' : 'toPage',
+              animations;
+          if (!animatable.getAnimationConfig) {
+              return;
+          }
+          animations = animatable.getAnimationConfig(type);
+          animations.forEach(function (animation) {
+              animation[pageKey] = target;
+          });
+      },
+
+      /**
+       * Check whether the given element has a configuration for a given type
+       * @param  {HTMLElement}  animatable An animatable element
+       * @param  {String}       type       A type of animation (e.g. `entry`, `exit`...)
+       * @return {Boolean}                 Whether the element has a configuration for the animation
+       */
+      _hasAnimation: function(animatable, type) {
+          return animatable.getAnimationConfig(type).length;
+      },
+
+      /**
+       * Finds the element containing the animation configuration
+       * @param  {HTMLTemplateElement} page     The template containing the animatable element
+       * @return {HTMLElement|null}             The animatable element
+       */
+      _getAnimationTarget: function (page) {
+        var animationTarget;
+        // The template is not instanciated or the instance has no child
+        if (!page._instance || !page._instance._children) {
+          return null;
+        }
+        // Loop through all the children until it finds the first element with the `animation-target` attribute
+        for (var i = 0; i < page._instance._children.length; i++) {
+          animationTarget = page._instance._children[i];
+          if (animationTarget instanceof HTMLElement && animationTarget.hasAttribute('animation-target')) {
+            return animationTarget;
+          }
+        }
+      },
+
+      _filterItem: function(node) {
+        return !this._excludedLocalNames[node.localName] || node.getAttribute('is') === 'animated-lazy-page';
+      }
+    });
+    Polymer({
+      is: 'animated-lazy-page',
+
+      extends: 'template',
+
+      properties: {
+        /**
+         * The url corresponding to the content which should be lazy-loaded.
+         */
+        path: {
+          type: String,
+          value: ''
+        }
+      },
+
+      behaviors: [
+        Polymer.Templatizer
+      ],
+
+      /*
+        ##################
+        BEGIN DOM-IF LOGIC
+        ##################
+       */
+      _loadAndShow: function(cb, loadAsync) {
+        var onImportFinished = function() {
+          this._stamp();
+          this._instance._showHideChildren(this.__hideTemplateChildren__);
+          cb();
+        }.bind(this);
+
+        if (!this.loaded && this.path) {
+          this._importHref(onImportFinished, loadAsync);
+        } else {
+          onImportFinished();
+        }
+      },
+
+      _stamp: function() {
+        if (!this.ctor) {
+          this.templatize(this);
+        }
+        // Attach logic of dom-if
+        var parentNode = Polymer.dom(this).parentNode;
+        if (parentNode) {
+          var parent = Polymer.dom(parentNode);
+          if (!this._instance) {
+            this._instance = this.stamp();
+            var root = this._instance.root;
+            parent.insertBefore(root, parent.firstElementChild);
+          } else {
+            var c$ = this._instance._children;
+            if (c$ && c$.length) {
+              // Detect case where dom-if was re-attached in new position
+              var lastChild = Polymer.dom(this).previousSibling;
+              if (lastChild !== c$[c$.length-1]) {
+                for (var i=0, n; (i<c$.length) && (n=c$[i]); i++) {
+                  parent.insertBefore(n, this);
+                }
+              }
+            }
+          }
+        }
+      },
+
+      // Implements extension point from Templatizer mixin
+      // Called as side-effect of a host property change, responsible for
+      // notifying parent.<prop> path change on instance
+      _forwardParentProp: function(prop, value) {
+        if (this._instance) {
+          this._instance[prop] = value;
+        }
+      },
+      // Implements extension point from Templatizer
+      // Called as side-effect of a host path change, responsible for
+      // notifying parent.<path> path change on each row
+      _forwardParentPath: function(path, value) {
+        if (this._instance) {
+          this._instance._notifyPath(path, value, true);
+        }
+      },
+
+      /*
+        ##################
+        END DOM-IF LOGIC
+        ##################
+       */
+
+      _importHref: function(cb, loadAsync) {
+        if (!this.timesFailed) {
+          this._path = this.path;
+          this.timesFailed = 0;
+        }
+        var self = this;
+        this.importHref(this._path, function(e) {
+          self.loaded = true;
+          self.timesFailed = 0;
+          document.head.removeChild(e.target || e.srcElement);
+          cb();
+        }, function(e) {
+          document.head.removeChild(e.target || e.srcElement);
+          self._path = self.path + '?' + self.timesFailed++;
+          cb();
+        }, loadAsync);
+      },
+
+      _hide: function(restamp) {
+        if (this._instance) {
+          if (restamp) {
+            var c$ = this._instance._children;
+            if (c$ && c$.length) {
+              // use first child parent, for case when dom-if may have been detached
+              var parent = Polymer.dom(Polymer.dom(c$[0]).parentNode);
+              for (var i=0, n; (i<c$.length) && (n=c$[i]); i++) {
+                parent.removeChild(n);
+              }
+            }
+            this._instance = null;
+          } else {
+            this._instance._showHideChildren(true);
+          }
+        }
+      }
+    });
+  })();
+  </script>
+</dom-module>
+<!--
+Template element used in conjunction with `animated-lazy-pages`.
+
+@element animated-lazy-page
+-->
+<dom-module id="animated-lazy-page">
+</dom-module>

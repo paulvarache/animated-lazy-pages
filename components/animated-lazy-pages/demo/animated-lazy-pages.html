@@ -1,0 +1,298 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <title>animated-lazy-pages Demo</title>
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <link rel="import" href="../../iron-demo-helpers/demo-snippet.html">
+    <link rel="import" href="../../iron-demo-helpers/demo-pages-shared-styles.html">
+    <link rel="import" href="../../neon-animation/animations/fade-in-animation.html">
+    <link rel="import" href="../../neon-animation/animations/fade-out-animation.html">
+    <link rel="import" href="../../neon-animation/animations/slide-right-animation.html">
+    <link rel="import" href="../../neon-animation/animations/hero-animation.html">
+    <link rel="import" href="../../neon-animation/animations/slide-from-left-animation.html">
+    <link rel="import" href="../../neon-animation/neon-animatable-behavior.html">
+    <link rel="import" href="../../neon-animation/neon-shared-element-animatable-behavior.html">
+    <link rel="import" href="../../neon-animation/neon-animatable.html">
+    <link rel="import" href="../../paper-tabs/paper-tabs.html">
+    <link rel="import" href="../../paper-tabs/paper-tab.html">
+    <link rel="import" href="../../paper-spinner/paper-spinner.html">
+    <link rel="import" href="../../iron-image/iron-image.html">
+    <link rel="import" href="../animated-lazy-pages.html">
+
+    <style is="custom-style" include="demo-pages-shared-styles"></style>
+    <style media="screen">
+      .demo {
+        display: flex;
+        flex-direction: column;
+      }
+      animated-lazy-pages {
+        position: relative;
+        overflow: auto;
+        height: 200px;
+      }
+      .animating {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+      }
+      .page {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+      }
+      .page-1 {
+        background-color: red;
+      }
+      .page-2 {
+        background-color: blue;
+      }
+      .page-3 {
+        background-color: green;
+      }
+    </style>
+  </head>
+  <body unresolved>
+    <demo-snippet class="centered">
+        <template>
+          <template is="dom-bind">
+            <p>
+              Three animated pages using the `neon-animatable` as animation target with fade-in/out animations
+            </p>
+            <paper-tabs selected="{{route}}" attr-for-selected='key'>
+              <paper-tab key='foo'>Foo</paper-tab>
+              <paper-tab key='bar'>Bar</paper-tab>
+              <paper-tab key='baz'>Baz!</paper-tab>
+            </paper-tabs>
+
+            <animated-lazy-pages attr-for-selected="data-route"
+                             selected="{{route}}"
+                             loading="{{loading}}"
+                             restamp
+                             animate-initial-selection>
+              <template is="animated-lazy-page" data-route="foo" path="element.html">
+                <neon-animatable class="page page-1" animation-target entry-animation="fade-in-animation" exit-animation="fade-out-animation">Foo page</neon-animatable>
+              </template>
+              <template is="animated-lazy-page" data-route="bar" path="bla.html">
+                <neon-animatable class="page page-2" animation-target entry-animation="fade-in-animation" exit-animation="fade-out-animation">Bar page</neon-animatable>
+              </template>
+              <template is="animated-lazy-page" data-route="baz">
+                <neon-animatable class="page page-3" animation-target entry-animation="fade-in-animation" exit-animation="fade-out-animation">Baz page</neon-animatable>
+              </template>
+            </animated-lazy-pages>
+            <paper-spinner active="[[loading]]"></paper-spinner>
+          </template>
+        </template>
+      </demo-snippet>
+    <demo-snippet class="centered">
+      <template>
+        <dom-module id="slide-page">
+          <style>
+          :host {
+            display: block;
+          }
+          </style>
+          <template>
+            <content></content>
+          </template>
+          <script type="text/javascript">
+            Polymer({
+              is: 'slide-page',
+              behaviors: [Polymer.NeonAnimatableBehavior],
+              ready: function () {
+                this.animationConfig = {
+                  entry: [{
+                    name: 'slide-from-left-animation',
+                    node: this
+                  },{
+                    name: 'fade-in-animation',
+                    node: this
+                  }],
+                  exit: [{
+                    name: 'slide-right-animation',
+                    node: this
+                  },{
+                    name: 'fade-out-animation',
+                    node: this
+                  }]
+                }
+              }
+            });
+          </script>
+        </dom-module>
+        <template is="dom-bind">
+          <p>
+            Three pages with animatable custom elements and custom animations
+          </p>
+          <paper-tabs selected="{{route}}" attr-for-selected='key'>
+            <paper-tab key='foo'>Foo</paper-tab>
+            <paper-tab key='bar'>Bar</paper-tab>
+            <paper-tab key='baz'>Baz!</paper-tab>
+          </paper-tabs>
+
+          <animated-lazy-pages attr-for-selected="data-route"
+                           selected="{{route}}"
+                           restamp
+                           animate-initial-selection>
+            <template is="animated-lazy-page" data-route="foo" path="element.html">
+              <slide-page class="page page-1" animation-target>Foo page</slide-page>
+            </template>
+            <template is="animated-lazy-page" data-route="bar" path="bla.html">
+              <slide-page class="page page-2" animation-target>Bar page</slide-page>
+            </template>
+            <template is="animated-lazy-page" data-route="baz">
+              <slide-page class="page page-3" animation-target>Baz page</slide-page>
+            </template>
+          </animated-lazy-pages>
+        </template>
+      </template>
+    </demo-snippet>
+    <demo-snippet class="centered">
+      <template>
+        <dom-module id="my-list-page">
+          <style>
+          :host {
+            display: block;
+          }
+          .items {
+            overflow-y: auto;
+          }
+          .picture {
+            width: 70px;
+            height: 70px;
+          }
+          .item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+          }
+          </style>
+          <template>
+            <div class="items">
+              <template is="dom-repeat" items="[[items]]">
+                <div class="item" on-tap="_onItemClick">
+                  <img src="https://unsplash.it/200" class="picture" />
+                  <span class="heading">Item [[index]]</span>
+                </div>
+              </template>
+            </div>
+          </template>
+          <script type="text/javascript">
+            Polymer({
+              is: 'my-list-page',
+              behaviors: [Polymer.NeonAnimatableBehavior, Polymer.NeonSharedElementAnimatableBehavior],
+              ready: function () {
+                this.items = new Array(9);
+                this.animationConfig = {
+                  'from-detail': [{
+                    name: 'slide-from-left-animation',
+                    node: this
+                  }],
+                  'to-detail': [{
+                    name: 'fade-out-animation',
+                    node: this
+                  },{
+                    name: 'hero-animation',
+                    id: 'picture',
+                    fromPage: this
+                  }]
+                };
+              },
+              _onItemClick: function (e) {
+                var picture = e.currentTarget.querySelector('img');
+                this.sharedElements = {
+                  picture: picture
+                };
+                this.fire('item-clicked');
+              }
+            });
+          </script>
+        </dom-module>
+        <dom-module id="my-detail-page">
+          <style>
+          :host {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+          }
+          .picture-full {
+            height: 100%;
+          }
+          button {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+          }
+          </style>
+          <template>
+            <img id="picture" src="https://unsplash.it/200" class="picture-full" />
+            <div>
+              <button type="button" name="button" on-tap="_goBack">Back</button>
+            </div>
+          </template>
+          <script type="text/javascript">
+            Polymer({
+              is: 'my-detail-page',
+              behaviors: [Polymer.NeonAnimatableBehavior, Polymer.NeonSharedElementAnimatableBehavior],
+              ready: function () {
+                this.animationConfig = {
+                  'from-list': [{
+                    name: 'hero-animation',
+                    id: 'picture',
+                    toPage: this
+                  }],
+                  'to-list': [{
+                    name: 'slide-right-animation',
+                    node: this
+                  }]
+                };
+                this.sharedElements = {
+                  'picture': this.$.picture
+                }
+              },
+              _goBack: function () {
+                this.fire('back-nav');
+              }
+            });
+          </script>
+        </dom-module>
+        <template is="dom-bind" id="demo">
+          <p>
+            Two pages using the `hero-animation`
+          </p>
+          <animated-lazy-pages attr-for-selected="data-route"
+                           selected="[[route]]"
+                           restamp>
+            <template is="animated-lazy-page" data-route="list" path="element.html">
+              <my-list-page id="list-page" on-item-clicked="_onItemClicked" animation-target></my-list-page>
+            </template>
+            <template is="animated-lazy-page" data-route="detail" path="bla.html">
+              <my-detail-page id="detail-page" on-back-nav="_goToList" animation-target></my-detail-page>
+            </template>
+          </animated-lazy-pages>
+        </template>
+        <script type="text/javascript">
+          var demo = document.getElementById('demo');
+          demo.route = 'list';
+          demo._onItemClicked = function (e) {
+            var listPage = document.getElementById('list-page');
+            demo.route = 'detail';
+          };
+          demo._goToList = function () {
+            demo.route = 'list';
+          };
+          demo._onItemClicked = function () {
+            demo.route = 'detail';
+          };
+        </script>
+      </template>
+    </demo-snippet>
+  </body>
+</html>
